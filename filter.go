@@ -57,6 +57,14 @@ func (f *Filter) Scan(data []byte) (int, error) {
 
 	// scope
 	endPos = bytes.IndexByte(data[pos:], ' ')
+	endPos2 := bytes.IndexByte(data[pos:], '\r')
+	if endPos2 != -1 && endPos2 < endPos {
+		endPos = endPos2
+	}
+	endPos3 := bytes.IndexByte(data[pos:], '\n')
+	if endPos3 != -1 && endPos3 < endPos {
+		endPos = endPos3
+	}
 
 	if endPos == -1 {
 		return 0, errors.New("Unexpected end of input near scope")
@@ -64,20 +72,22 @@ func (f *Filter) Scan(data []byte) (int, error) {
 
 	f.Scope = string(data[pos : pos+endPos])
 	if _, ok := scopes[f.Scope]; !ok {
-		return 0, errors.New("Scope " + f.Scope + " is not supported")
+		f.Scope = ""
+	} else {
+		pos = skipWhiteSpace(data, pos+endPos)
 	}
 
-	pos = skipWhiteSpace(data, pos+endPos)
 	if f.Scope == "true" {
 		goto processActions
 	}
 
 	// read rules
-	if data[pos] != '(' {
-		return 0, errors.New("After scope expected \"(\"")
+	if f.Scope != "" {
+		if data[pos] != '(' {
+			return 0, errors.New("After scope expected \"(\"")
+		}
+		pos++
 	}
-
-	pos++
 
 	for pos < l {
 		pos = skipWhiteSpace(data, pos)
@@ -97,11 +107,13 @@ func (f *Filter) Scan(data []byte) (int, error) {
 		pos++
 	}
 
-	if data[pos] != ')' {
-		return 0, errors.New("Unexpected end of scope, expect \")\"")
-	}
+	if f.Scope != "" {
+		if data[pos] != ')' {
+			return 0, errors.New("Unexpected end of scope, expect \")\"")
+		}
 
-	pos++
+		pos++
+	}
 
 processActions:
 
@@ -172,13 +184,18 @@ func (f Filter) String() string {
 		return "NO RULES"
 	}
 
-	rules = rules + " ("
+	if f.Scope != "" {
+		rules = rules + " ("
+	}
 
 	for _, r := range f.Rules {
 		rls = append(rls, r.String())
 	}
-
-	rules = rules + strings.Join(rls, ",") + ")"
+	if f.Scope != "" {
+		rules = rules + strings.Join(rls, ",") + ")"
+	} else {
+		rules = rules + strings.Join(rls, ",")
+	}
 
 processActions:
 	res = append(res, rules, "{")
