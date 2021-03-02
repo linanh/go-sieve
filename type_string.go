@@ -9,16 +9,18 @@ type stringBase string
 
 // Escape string
 func (s stringBase) String() string {
-	res := ""
+	res := []byte{'"'}
 	for i, l := 0, len(s); i < l; i++ {
 		if s[i] == '"' || s[i] == '\\' {
-			res += `\`
+			res = append(res, '\\')
 		}
 
-		res += string(s[i])
+		res = append(res, s[i])
 	}
 
-	return "\"" + res + "\""
+	res = append(res, '"')
+
+	return string(res)
 }
 
 func (s *stringBase) Scan(data []byte) (int, error) {
@@ -33,6 +35,7 @@ func (s *stringBase) Scan(data []byte) (int, error) {
 		return 0, errorMsg("String dont start with quote: ", data)
 	}
 
+	strBytes := []byte{}
 	for ; pos+1 < l; pos++ {
 		if data[pos] == byte('"') {
 			break
@@ -43,8 +46,10 @@ func (s *stringBase) Scan(data []byte) (int, error) {
 			pos++
 		}
 
-		*s = *s + stringBase(data[pos])
+		strBytes = append(strBytes, data[pos])
 	}
+
+	*s = *s + stringBase(strBytes)
 
 	// check end of string, if has double quotes
 	if data[pos] != byte('"') {
