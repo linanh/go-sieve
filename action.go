@@ -19,16 +19,17 @@ var action = []struct {
 	{"setflag", []byte(`setflag`)},       // string		// imap4flags
 	{"addflag", []byte(`addflag`)},       // string		// imap4flags
 	{"removeflag", []byte(`removeflag`)}, // string	// imap4flags
-	// {"vacation", []byte(``)},
+	{"vacation", []byte(`vacation`)},     // map[string]string
 	// {"set", []byte(``)},
 	// {"notify", []byte(``)},
 	// {"keep", []byte(``)},
-	// {"stop", []byte(`stop`)},
+	{"stop", []byte(`stop`)},
 }
 
 type Action struct {
 	Type   string     `json:"type"`
 	Values StringType `json:"values,omitempty"`
+	Params ParamsType `json:"params,omitempty"`
 }
 
 func (a *Action) Scan(data []byte) (int, error) {
@@ -56,6 +57,21 @@ func (a *Action) Scan(data []byte) (int, error) {
 		return pos, nil
 	}
 
+	if a.Type == "stop" { // has no params
+		return pos, nil
+	}
+
+	if a.Type == "vacation" {
+		pos = skipWhiteSpace(data, pos)
+		a.Params = ParamsType{}
+		if i, err := a.Params.Scan(data[pos:]); err != nil {
+			return 0, err
+		} else {
+			pos = pos + i
+		}
+		return pos, nil
+	}
+
 	pos = skipWhiteSpace(data, pos)
 
 	if i, err := a.Values.Scan(data[pos:]); err != nil {
@@ -71,6 +87,11 @@ func (a Action) String() string {
 	var res []string
 
 	for _, act := range action {
+		if a.Type == "vacation" {
+			res = append(res, a.Params.String())
+			break
+		}
+
 		if a.Type == act.Name {
 			res = append(res, string(act.Src))
 			break
